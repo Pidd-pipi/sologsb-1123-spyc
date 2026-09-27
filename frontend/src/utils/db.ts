@@ -2,11 +2,12 @@ import Dexie, { type Table } from 'dexie';
 import type { CameraPreset, Mission } from '../types/mission';
 import type { Waypoint } from '../types/waypoint';
 import type { FlightLine } from '../types/flightline';
+import type { ReflightTask } from '../types/reflight';
 import { makeThumbDataUrl, type AssetThumb, type ImageAsset } from '../types/imageasset';
 import { newId } from './id';
 
 export const DB_NAME = 'gbdronemap';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 export const LS_VERSION_KEY = 'gbdronemap:db-version';
 
 class DroneMapDB extends Dexie {
@@ -16,6 +17,7 @@ class DroneMapDB extends Dexie {
   assets!: Table<ImageAsset, string>;
   thumbs!: Table<AssetThumb, string>;
   presets!: Table<CameraPreset, string>;
+  reflights!: Table<ReflightTask, string>;
 
   constructor() {
     super(DB_NAME);
@@ -55,6 +57,10 @@ class DroneMapDB extends Dexie {
             if (row.batteryCount === undefined) row.batteryCount = 1;
           });
       });
+    // v3：新增补飞任务表（覆盖核查结论的独立清单，快照保存，不回写）
+    this.version(3).stores({
+      reflights: 'id, missionId, createdAt',
+    });
   }
 }
 

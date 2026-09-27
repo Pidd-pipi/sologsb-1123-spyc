@@ -16,6 +16,8 @@ export interface AmapRouteViewProps {
   onPickPoint?: (lng: number, lat: number) => void;
   /** 高亮的航点序号（例如从成果编目页「定位到图」） */
   highlightSeq?: number;
+  /** 覆盖核查缺口航点序号（红圈标出） */
+  gapSeqs?: number[];
   /** 航点标注（用于单点视场预览） */
   withFov?: boolean;
 }
@@ -34,6 +36,7 @@ export default function AmapRouteView({
   height = 420,
   onPickPoint,
   highlightSeq,
+  gapSeqs,
   withFov = true,
 }: AmapRouteViewProps) {
   const [amap, setAmap] = useState<AMapNamespace | null>(null);
@@ -103,6 +106,19 @@ export default function AmapRouteView({
           title: `#${w.seq} ${w.altitude} m ${w.action}`,
         }),
       );
+      // 覆盖核查缺口航点：红色虚线圆标出
+      if (gapSeqs && gapSeqs.includes(w.seq)) {
+        overlays.push(
+          new amap.Circle({
+            center: [w.lng, w.lat],
+            radius: 25,
+            strokeColor: '#d93025',
+            strokeWeight: 2,
+            strokeStyle: 'dashed',
+            fillOpacity: 0,
+          }),
+        );
+      }
       if (withFov) {
         const side = groundCoverage(mission.sensorWidth, w.altitude, mission.focalLength);
         const along = groundCoverage(mission.sensorHeight, w.altitude, mission.focalLength);
@@ -132,7 +148,7 @@ export default function AmapRouteView({
       }
       mapRef.current = null;
     };
-  }, [mode, amap, mission, waypoints, withFov]);
+  }, [mode, amap, mission, waypoints, withFov, gapSeqs]);
 
   // 本地 SVG 网格视图：等比投影，完全离线
   const projection = useMemo(() => {
@@ -258,8 +274,12 @@ export default function AmapRouteView({
         {waypoints.map((w) => {
           const p = projection.projector.toXY([w.lng, w.lat]);
           const active = w.seq === highlightSeq;
+          const isGap = gapSeqs?.includes(w.seq) ?? false;
           return (
             <g key={w.id}>
+              {isGap ? (
+                <circle cx={p.x} cy={p.y} r={11} fill="none" stroke="#d93025" strokeWidth={2} strokeDasharray="4 3" />
+              ) : null}
               <circle cx={p.x} cy={p.y} r={active ? 8 : 5} fill={active ? '#d93025' : '#1d3557'} />
               <text x={p.x + 9} y={p.y - 6} fontSize="11" fill="#3c4652">
                 #{w.seq} {w.altitude}m {w.action}
@@ -279,6 +299,7 @@ export default function AmapRouteView({
         <Tag color="blue">测区边界</Tag>
         <Tag color="orange">航点折线（{waypoints.length} 点）</Tag>
         <Tag>每航点视场矩形</Tag>
+        {gapSeqs && gapSeqs.length > 0 ? <Tag color="red">缺口航点 {gapSeqs.length} 个（红圈）</Tag> : null}
         <Tag color="gold">1 px ≈ {pxPerMeter > 0 ? (1 / pxPerMeter).toFixed(1) : '—'} m</Tag>
         {onPickPoint ? <Tag color="green">点击网格可新增航点</Tag> : null}
       </Space>
